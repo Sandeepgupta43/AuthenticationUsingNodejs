@@ -661,6 +661,53 @@ const getUserChannelProfile = async (req, res) => {
     }
 };
 
+const getWatchHistory = async (req, res) => {
+    
+    try {
+        // const user = await new Promise((resolve, reject) => {
+        //     db.query(
+        //         "select id, username from user where id = ?",
+        //         [req.user.id],
+        //         (error, result) => {
+        //             if (error) return reject(error);
+        //             resolve(result);
+        //         }
+        //     );
+        // });
+
+        // if (!user) {
+        //     return res.status(400).json({
+        //         message: "Error while fetching user from database",
+        //     });
+        // }
+        // const currUser = user[0];
+        
+
+        const watchHistory = await new Promise((resolve, reject) => {
+            db.query(
+                `select v.id, v.videoFile,v.thumbnail, v.title, v.duration, v.views, v.createdAt
+                from video v
+                JOIN user u on u.watchHistory = v.id
+                WHERE u.id = ?`,
+                [req.user.id],
+                (error, result) => {
+                    if (error) return reject(error);
+                    resolve(result);
+                }
+            );
+        });
+
+        return res.status(200).json({
+            message:"Watch history fetched successfully",
+            watchHistory:watchHistory
+        })
+    } catch (err) {
+        return res.status(500).json({
+            message: "Something went wrong",
+        });
+    }
+};
+
 export {
     registerUser,
     loginUser,
@@ -672,4 +719,5 @@ export {
     updateUserAvtar,
     updateCoverImage,
     getUserChannelProfile,
+    getWatchHistory,
 };
