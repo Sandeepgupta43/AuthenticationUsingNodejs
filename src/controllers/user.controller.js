@@ -418,9 +418,9 @@ const currentPasswordChange = async (req, res) => {
         }
         console.log("after check is password correct");
         const hashedPassword = generateHashPassword(newPassword);
-        console.log("hashed password : ",hashedPassword);
+        console.log("hashed password : ", hashedPassword);
         const currUser = user[0];
-        console.log("current user : ",currUser);
+        console.log("current user : ", currUser);
 
         const newUser = await new Promise((resolve, reject) => {
             db.query(
@@ -432,7 +432,7 @@ const currentPasswordChange = async (req, res) => {
                 }
             );
         });
-        console.log("New User : ",newUser);
+        console.log("New User : ", newUser);
 
         return res.status(200).json({
             message: "Password chnage success",
@@ -447,7 +447,7 @@ const currentPasswordChange = async (req, res) => {
 const getCurrentUser = async (req, res) => {
     return res.status(200).json({
         message: "Current User fetch success",
-        user:req.user
+        user: req.user,
     });
 };
 
@@ -555,6 +555,112 @@ const updateCoverImage = async (req, res) => {
     }
 };
 
+const getUserChannelProfile = async (req, res) => {
+    const { username } = req.params;
+    //console.log("Username : ",username);
+    if (!username || !username.trim()) {
+        return res.status(400).json({
+            message: "username is missing",
+        });
+    }
+
+    try {
+        const user = await new Promise((resolve, reject) => {
+            db.query(
+                "select id,username,email,fullName,avatar,coverImage,createdAt from user where username = ?",
+                [username],
+                (error, result) => {
+                    if (error) return reject(error);
+                    resolve(result);
+                }
+            );
+        });
+
+        if (!user) {
+            return res.status(400).json({
+                message: "User not found",
+            });
+        }
+
+        const currUser = user[0];
+        //console.log("Current user : ", currUser);
+
+        //Get video count from database
+        const videoCount = await new Promise((resolve, reject) => {
+            db.query(
+                "select count(*) as videoCount from video where owner = ?",
+                [currUser.id],
+                (error, result) => {
+                    if (error) return reject(error);
+                    resolve(result);
+                }
+            );
+        });
+        //console.log("Total video : ", videoCount);
+
+        // Get subscribers count from database
+        const subscriberCount = await new Promise((resolve, reject) => {
+            db.query(
+                "select count(*) as subscriberCount from subscription where channel = ?;",
+                [currUser.id],
+                (error, result) => {
+                    if (error) return reject(error);
+                    resolve(result);
+                }
+            );
+        });
+        console.log("Total subscriber : ", subscriberCount);
+        const totalSubscribeChannel = await new Promise((resolve, reject) => {
+            db.query(
+                "select COUNT(*) as count from subscription where subscriber = ?;",
+                [currUser.id],
+                (error, result) => {
+                    if (error) return reject(error);
+                    resolve(result);
+                }
+            );
+        });
+        console.log("Total subscribed channel : ", totalSubscribeChannel);
+
+        // Get all subscribe channel
+        const subscribedChannel = await new Promise((resolve, reject) => {
+            db.query(
+                `select u.id, u.username, u.avatar
+                 from subscription s 
+                 JOIN user u on s.channel = u.id 
+                 where s.subscriber = ?;`,
+                [currUser.id],
+                (error, result) => {
+                    if (error) return reject(error);
+                    resolve(result);
+                }
+            );
+        });
+        console.log("Subscribed Channel : ", subscribedChannel);
+
+        return res.status(200).json({
+            message: "user channel details fetch success",
+            user: {
+                id: currUser.id,
+                username: currUser.username,
+                email: currUser.email,
+                fullName: currUser.fullName,
+                avatar: currUser.avatar,
+                coverImage: currUser.coverImage,
+                createdAt: currUser.createdAt,
+                totalVideo: videoCount,
+                totalSubscriber: subscriberCount,
+                subscribedChannel: subscribedChannel,
+                totalSubscribeChannel: totalSubscribeChannel,
+            },
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: "Something went wrong",
+        });
+    }
+};
+
 export {
     registerUser,
     loginUser,
@@ -565,4 +671,5 @@ export {
     updateUserAccount,
     updateUserAvtar,
     updateCoverImage,
+    getUserChannelProfile,
 };
