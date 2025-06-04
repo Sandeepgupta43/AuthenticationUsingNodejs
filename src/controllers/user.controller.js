@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import fs from "fs";
 import { generateAccessToken } from "../utils/generateAccessToken.js";
 import { generateRefreshToken } from "../utils/generateRefreshToken.js";
+import jwt from "jsonwebtoken";
 
 const db = connectDB();
 
@@ -276,7 +277,6 @@ const loginUser = async (req, res) => {
 };
 
 const logoutUser = async (req, res) => {
-    
     const { userId } = req.user;
     try {
         await new Promise((resolve, reject) => {
@@ -315,4 +315,75 @@ const logoutUser = async (req, res) => {
     }
 };
 
-export { registerUser, loginUser, logoutUser };
+const refreshAccessToken = async (req, res) => {
+    //console.log("Inside refresh token");
+    const incommingRefreshToken =
+        req.cookies.refreshToken || req.body.refreshToken;
+    if (!incommingRefreshToken) {
+        return res.status(400).json({
+            message: "Unauthorize access",
+        });
+    }
+    //console.log("Incomming refresh token : ",incommingRefreshToken);
+
+    try {
+        const decodedToken = jwt.verify(
+            incommingRefreshToken,
+            process.env.REFRESH_TOKEN
+        );
+        console.log("Decoded Token : ", decodedToken);
+        const user = await new Promise((resolve, reject) => {
+            db.query(
+                "select * from user where id = ?;",
+                [decodedToken.id],
+                (error, result) => {
+                    if (error) {
+                        return reject(error);
+                    }
+                    resolve(result);
+                }
+            );
+        });
+        //console.log("after db query -> ", user[0]);
+        const currUser = user[0];
+
+        if (!currUser) {
+            return res.status(401).json({
+                message: "Invaild refresh token",
+            });
+        }
+
+        if (incommingRefreshToken !== currUser.refreshToken) {
+            return res.status(401).json({
+                message: "Refresh token either expire or used",
+            });
+        }
+
+        const options = {
+            httpOnly: true,
+            secure: true,
+        };
+
+        const { accessToken, newRefreshToken } =
+            await generateAccessAndRefreshTokens(currUser.id);
+
+        return res
+            .status(200)
+            .cookie("accessToken", accessToken, options)
+            .cookie("refreshToken", newRefreshToken, options)
+            .json({
+                message: "Access token refreshed success",
+                user: {
+                    id: currUser.id,
+                    email: currUser.email,
+                    username: currUser.username || null,
+                },
+            });
+    } catch (error) {
+        return res.status(500).json({
+            message: "Internal server error",
+        });
+    }
+};
+
+export { registerUser, loginUser, logoutUser, refreshAccessToken };
