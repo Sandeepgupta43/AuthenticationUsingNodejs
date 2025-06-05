@@ -662,7 +662,6 @@ const getUserChannelProfile = async (req, res) => {
 };
 
 const getWatchHistory = async (req, res) => {
-    
     try {
         // const user = await new Promise((resolve, reject) => {
         //     db.query(
@@ -681,14 +680,24 @@ const getWatchHistory = async (req, res) => {
         //     });
         // }
         // const currUser = user[0];
-        
 
         const watchHistory = await new Promise((resolve, reject) => {
             db.query(
-                `select v.id, v.videoFile,v.thumbnail, v.title, v.duration, v.views, v.createdAt
+                `select 
+	                v.id, 
+                    v.videoFile, 
+                    v.thumbnail, 
+                    v.title, 
+                    v.duration, 
+                    v.views,
+                    v.createdAt, 
+                    owner_user.username as ownerUsername,
+                    owner_user.email as ownerEmail,
+                    owner_user.avatar as avatar
                 from video v
-                JOIN user u on u.watchHistory = v.id
-                WHERE u.id = ?`,
+                JOIN user u on v.id = u.watchHistory
+                Join user owner_user on v.owner = owner_user.id
+                where u.id = ?;`,
                 [req.user.id],
                 (error, result) => {
                     if (error) return reject(error);
@@ -698,9 +707,9 @@ const getWatchHistory = async (req, res) => {
         });
 
         return res.status(200).json({
-            message:"Watch history fetched successfully",
-            watchHistory:watchHistory
-        })
+            message: "Watch history fetched successfully",
+            watchHistory: watchHistory,
+        });
     } catch (err) {
         return res.status(500).json({
             message: "Something went wrong",
